@@ -1,148 +1,161 @@
-#!/usr/bin/bash
-# Written by: cyberknight777
-# YAKB v1.0
-# Copyright (c) 2022-2023 Cyber Knight <cyberknight755@gmail.com>
+#!/usr/bin/env bash
 #
-#			GNU GENERAL PUBLIC LICENSE
-#			 Version 3, 29 June 2007
+# Copyright (C) 2021 a xyzprjkt property
+# Copyright (C) 2021 a Panchajanya1999 <rsk52959@gmail.com>
+# Copyright (C) 2022 a Himemorii <himemori@mail.com>
 #
-# Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
-# Everyone is permitted to copy and distribute verbatim copies
-# of this license document, but changing it is not allowed.
 
-# Some Placeholders: [!] [*] [✓] [✗]
-
-# A function to send message(s) via Telegram's BOT api.
-tg() {
-    curl -sX POST https://api.telegram.org/bot"${TG_TOKEN}"/sendMessage \
-        -d chat_id="$TG_CHAT_ID" \
-        -d parse_mode=html \
-        -d disable_web_page_preview=true \
-        -d text="$1"
+msg() {
+	echo
+	echo -e "\e[1;32m$*\e[0m"
+	echo
 }
 
-tgs() {
-    SHA1=$(sha1sum "$1" | cut -d' ' -f1)
-    curl -fsSL -X POST -F document=@"$1" https://api.telegram.org/bot"${TG_TOKEN}"/sendDocument \
-        -F "chat_id=$TG_CHAT_ID" \
-        -F "parse_mode=Markdown" \
-        -F "caption=$2"
-}
+# Main Dir Info
+KERNEL_ROOTDIR=$(pwd)
+CLANG_ROOTDIR=$(pwd)/clang-llvm
+GCC64_DIR=$(pwd)/GCC64
+GCC32_DIR=$(pwd)/GCC32
 
-tgf() {
-    SHA1=$(sha1sum "$1" | cut -d' ' -f1)
-    curl -fsSL -X POST -F document=@"$1" https://api.telegram.org/bot"${TG_TOKEN}"/sendDocument \
-        -F "chat_id=$TG_CHAT_ID" \
-        -F "parse_mode=Markdown" \
-        -F "caption=$2"
-}
+msg "|| Cloning Toolchain ||"
+git clone --depth=1 https://github.com/cyberknight777/gcc-arm64 -b master $GCC64_DIR
+git clone --depth=1 https://github.com/cyberknight777/gcc-arm -b master $GCC32_DIR
 
-# Default defconfig to use for builds.
-CONFIG="merlin_defconfig"
+# Main Declaration
+MODEL=Redmi Note 9
+DEVICE_CODENAME=merlin
+DEVICE_DEFCONFIG=merlin_defconfig
+AK3_BRANCH=merlin
+KERNEL_NAME=$(cat "arch/arm64/configs/$DEVICE_DEFCONFIG" | grep "CONFIG_LOCALVERSION=" | sed 's/CONFIG_LOCALVERSION="-*//g' | sed 's/"*//g' )
+export KBUILD_BUILD_USER=Himemori
+export KBUILD_BUILD_HOST=XZI-TEAM
+GCC_VER="$("$GCC64_DIR"/bin/aarch64-elf-gcc --version | head -n 1)"
+LLD_VER="$("$GCC64_DIR"/bin/aarch64-elf-ld.lld --version | head -n 1)"
+IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
+DATE=$(TZ=Asia/Jakarta date +"%Y%m%d-%T")
+DATE2=$(date +"%m%d")
+START=$(date +"%s")
+DTB=$(pwd)/out/arch/arm64/boot/dts/mediatek/mt6768.dtb
+DTBO=$(pwd)/out/arch/arm64/boot/dtbo.img
+DISTRO=$(source /etc/os-release && echo "${NAME}")
+export KBUILD_COMPILER_STRING="$GCC_VER with $LLD_VER"
+PATH="$GCC64_DIR/bin/:$GCC32_DIR/bin/:/usr/bin:$PATH"
 
-# Default directory where kernel is located in.
-KDIR=$(pwd)
-
-# Kernel Name
-KNAME=$(cat "arch/arm64/configs/$CONFIG" | grep "CONFIG_LOCALVERSION=" | sed 's/CONFIG_LOCALVERSION="-*//g' | sed 's/"*//g' )
-
-# Device and codename.
-DEVICE="Redmi Note 9"
-CODENAME="merlin"
-
-# User and Host name
-BUILDER=Himemori
-HOST=XZI-TEAM
-
-# Number of jobs to run.
-PROCS=$(nproc --all)
-
-# Another stuff
-DATE=$(date +"%m%d")
-HEAD="$(git log --pretty=format:'%h' -n1)"
+#Check Kernel Version
 KERVER=$(make kernelversion)
 
-Ai1() {
+# Set a commit head
+COMMIT_HEAD=$(git log --oneline -1)
+HEADCOMMITID="$(git log --pretty=format:'%h' -n1)"
+HEADCOMMITMSG="$(git log --pretty=format:'%s' -n1)"
+CI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TERM=xterm
+PROCS=$(nproc --all)
+export CI_BRANCH TERM
 
-    echo -e "\n\e[1;93m[*] Cloning toolchain for build! \e[0m"
-    git clone https://github.com/mvaisakh/gcc-arm64 -b gcc-master  --depth=1 "${KDIR}"/gcc64
-    git clone https://github.com/mvaisakh/gcc-arm -b gcc-master --depth=1 "${KDIR}"/gcc32
-    git clone https://github.com/Himemoria/AnyKernel3 -b merlin --depth=1 "${KDIR}"/anykernel3
-    echo -e "\n\e[1;32m[✓] Successful cloning all toolchain! \e[0m"
+## Check for CI
+if [ "$CI" ]
+then
+	if [ "$CIRCLECI" ]
+	then
+		export KBUILD_BUILD_VERSION=$CIRCLE_BUILD_NUM
+		export CI_BRANCH=$CIRCLE_BRANCH
+	fi
+	if [ "$DRONE" ]
+	then
+		export KBUILD_BUILD_VERSION=$DRONE_BUILD_NUMBER
+		export CI_BRANCH=$DRONE_BRANCH
+		export BASEDIR=$DRONE_REPO_NAME # overriding
+		export SERVER_URL="${DRONE_SYSTEM_PROTO}://${DRONE_SYSTEM_HOSTNAME}/${AUTHOR}/${BASEDIR}/${KBUILD_BUILD_VERSION}"
+	else
+		echo "Not presetting Build Version"
+	fi
+fi
 
-    LLD_VER=$("${KDIR}"/gcc64/bin/aarch64-elf-ld.lld -v | head -n1 | sed 's/(compatible with [^)]*)//' |
-            head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
-    KBUILD_COMPILER_STRING=$("${KDIR}"/gcc64/bin/aarch64-elf-gcc --version | head -n 1)
-    export KBUILD_COMPILER_STRING
-    export PATH="${KDIR}"/gcc64/bin/:"${KDIR}"/gcc32/bin/:/usr/bin:$PATH
-    MAKE+=(
-        ARCH=arm64
-        O=out
-        CROSS_COMPILE=aarch64-elf-
-        CROSS_COMPILE_ARM32=arm-eabi-
-        LD=aarch64-elf-ld.lld
-        AR=llvm-ar
-        NM=llvm-nm
-        OBJDUMP=llvm-objdump
-        OBJCOPY=llvm-objcopy
-        OBJSIZE=llvm-objsize
-        STRIP=llvm-strip
-        HOSTAR=llvm-ar
-        HOSTCC=gcc
-        HOSTCXX=aarch64-elf-g++
-        CC=aarch64-elf-gcc
-        CONFIG_SECTION_MISMATCH_WARN_ONLY=y
-        CONFIG_DEBUG_SECTION_MISMATCH=y
-    )
+# Telegram
+export BOT_MSG_URL="https://api.telegram.org/bot$TG_TOKEN/sendMessage"
 
-    export KBUILD_BUILD_VERSION=$GITHUB_RUN_NUMBER
-    export KBUILD_BUILD_HOST=$HOST
-    export KBUILD_BUILD_USER=$BUILDER
-    zipn=[$DATE][$KERVER]$KNAME[$CODENAME][R-OSS]-$HEAD
+tg_post_msg() {
+  curl -s -X POST "$BOT_MSG_URL" -d chat_id="$TG_CHAT_ID" \
+  -d "disable_web_page_preview=true" \
+  -d "parse_mode=html" \
+  -d text="$1"
 
-
-#    echo -e "\n\e[1;93m[*] Regenerating defconfig! \e[0m"
-#    make "${MAKE[@]}" $CONFIG
-#    cp -rf "${KDIR}"/out/.config "${KDIR}"/arch/arm64/configs/xiaomi/$CONFIG
-#    echo -e "\n\e[1;32m[✓] Defconfig regenerated! \e[0m"
-
-
-tg "
-<b>Date</b>: <code>$(date)</code>
-<b>Device</b>: <code>${DEVICE}</code>
-<b>Kernel Version</b>: <code>$(make kernelversion 2>/dev/null)</code>
-<b>Zip Name</b>: <code>${zipn}</code>
-<b>Compiler</b>: <code>${KBUILD_COMPILER_STRING}</code>
-<b>Linker</b>: <code>${LLD_VER}</code>
-"
-
-
-    echo -e "\n\e[1;93m[*] Building Kernel! \e[0m"
-    BUILD_START=$(date +"%s")
-    time make -j"$PROCS" "$CONFIG" "${MAKE[@]}" Image.gz dtbo.img 2>&1 | tee log.txt
-    BUILD_END=$(date +"%s")
-    DIFF=$((BUILD_END - BUILD_START))
-    if [ -f "${KDIR}/out/arch/arm64/boot/Image.gz" ]; then
-        echo -e "\n\e[1;32m[✓] Kernel built after $((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s)! \e[0m"
-    else
-            tgf "log.txt" "*❌ Build failed after*: $((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s) "
-        echo -e "\n\e[1;31m[✗] Build Failed! \e[0m"
-        exit 1
-    fi
-
-    echo -e "\n\e[1;93m[*] Building DTBS! \e[0m"
-    time make -j"$PROCS" "${MAKE[@]}" dtbs dtbo.img
-    echo -e "\n\e[1;32m[✓] Built DTBS! \e[0m"
-
-        tg "<b>Building zip!</b>"
-    echo -e "\n\e[1;93m[*] Building zip! \e[0m"
-    mv "${KDIR}"/out/arch/arm64/boot/dtbo.img "${KDIR}"/anykernel3
-    mv "${KDIR}"/out/arch/arm64/boot/dts/mediatek/mt6768.dtb "${KDIR}"/anykernel3/dtb
-    mv "${KDIR}"/out/arch/arm64/boot/Image.gz "${KDIR}"/anykernel3
-    cd "${KDIR}"/anykernel3 || exit 1
-    zip -r9 "$zipn".zip . -x ".git*" -x "README.md" -x "LICENSE" -x "*.zip"
-
-    echo -e "\n\e[1;93m[*] Push zip into channel! \e[0m"
-        tgs "$zipn.zip" "*✅ Build success after*: $((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s)"
 }
-Ai1
+
+# Post Main Information
+tg_post_msg "<b>New Kernel Under Compilation</b>%0ADate : <code>$(TZ=Asia/Jakarta date)</code>%0A<code> --- Detail Info About it --- </code>%0A<b>- Docker OS: </b><code>$DISTRO</code>%0A- Kernel Name : <code>${KERNEL_NAME}</code>%0A- Kernel Version : <code>${KERVER}</code>%0A- Builder Name : <code>${KBUILD_BUILD_USER}</code>%0A- Builder Host : <code>${KBUILD_BUILD_HOST}</code>%0A- Host Core Count : <code>$PROCS</code>%0A- Compiler Used : <code>${KBUILD_COMPILER_STRING}</code>%0A- Branch : <code>$CI_BRANCH</code>%0A- Top Commit : <code>$COMMIT_HEAD</code>"
+
+  MAKE+=(
+    CC=aarch64-elf-gcc
+    LD=aarch64-elf-ld.lld
+    CROSS_COMPILE=aarch64-elf-
+    CROSS_COMPILE_ARM32=arm-eabi-
+    AR=llvm-ar
+    NM=llvm-nm
+    OBJDUMP=llvm-objdump
+    OBJCOPY=llvm-objcopy
+    OBJSIZE=llvm-objsize
+    STRIP=llvm-strip
+    HOSTAR=llvm-ar
+    HOSTCC=gcc
+    HOSTCXX=aarch64-elf-g++
+)
+
+# Compile
+compile(){
+msg "|| Started Compilation ||"
+cd ${KERNEL_ROOTDIR}
+make -j$(nproc) O=out ARCH=arm64 ${DEVICE_DEFCONFIG}
+make -j$(nproc) ARCH=arm64 O=out CONFIG_DEBUG_SECTION_MISMATCH=y CONFIG_SECTION_MISMATCH_WARN_ONLY=y \
+         "${MAKE[@]}" 2>&1 | tee error.log
+
+   if ! [ -a "$IMAGE" ]; then
+	finerr
+	exit 1
+   fi
+
+  git clone --depth=1 https://github.com/Himemoria/AnyKernel3 -b ${AK3_BRANCH} AnyKernel
+    cp $IMAGE AnyKernel
+    cp $DTBO AnyKernel
+    mv $DTB AnyKernel/dtb
+}
+
+# Push kernel to channel
+function push() {
+    msg "|| Started Uploading ||"
+    cd AnyKernel
+    ZIP_NAME=[$DATE2][$KERVER]$KERNEL_NAME[$DEVICE_CODENAME][R-OSS]-$HEADCOMMITID.zip
+    ZIP=$(echo *.zip)
+    MD5CHECK=$(md5sum "${ZIP}" | cut -d' ' -f1)
+    SHA1CHECK=$(sha1sum "${ZIP}" | cut -d' ' -f1)
+    tg_post_msg "✅ <b>Build Success</b>%0A- <code>$((DIFF / 60)) minute(s) $((DIFF % 60)) second(s) </code>%0A<b>MD5 Checksum</b>%0A- <code>${MD5CHECK}</code>%0A<b>SHA1 Checksum</b>%0A- <code>${SHA1CHECK}</code>%0A<b>Under Commit Id Message</b>%0A- <code>${COMMIT_HEAD}</code>%0A<b>Compilers</b>%0A- <code>$KBUILD_COMPILER_STRING</code>%0A<b>Zip Name</b>%0A- <code>${ZIP_NAME}</code>%0A%0A-- Happy Using --"
+    curl -F document=@$ZIP "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
+        -F chat_id="$TG_CHAT_ID" \
+        -F "disable_web_page_preview=true" \
+        -F "parse_mode=html" \
+        -F caption="✅ Compile took $((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s)"
+}
+# Fin Error
+function finerr() {
+    LOG=$(echo error.log)
+    curl -F document=@$LOG "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
+        -F chat_id="$TG_CHAT_ID" \
+        -F "disable_web_page_preview=true" \
+        -F "parse_mode=html" \
+        -F caption="❌ Compilation Failed. | For <b>${DEVICE_CODENAME}</b> | <b>${KBUILD_COMPILER_STRING}</b>"
+    exit 1
+}
+
+# Zipping
+function zipping() {
+    msg "|| Started Zipping ||"
+    cd AnyKernel || exit 1
+    zip -r9 [$DATE2][$KERVER]$KERNEL_NAME[$DEVICE_CODENAME][R-OSS]-$HEADCOMMITID.zip *
+    cd ..
+}
+compile
+zipping
+END=$(date +"%s")
+DIFF=$(($END - $START))
+push
