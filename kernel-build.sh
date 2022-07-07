@@ -28,8 +28,8 @@ DEVICE_CODENAME=merlin
 DEVICE_DEFCONFIG=merlin_defconfig
 AK3_BRANCH=merlin
 KERNEL_NAME=$(cat "arch/arm64/configs/$DEVICE_DEFCONFIG" | grep "CONFIG_LOCALVERSION=" | sed 's/CONFIG_LOCALVERSION="-*//g' | sed 's/"*//g' )
-export KBUILD_BUILD_USER=Himemori
-export KBUILD_BUILD_HOST=XZI-TEAM
+export KBUILD_BUILD_USER=Rezz
+export KBUILD_BUILD_HOST=Gensin-imp
 CLANG_VER="$("$CLANG_ROOTDIR"/bin/clang --version | head -n 1)"
 LLD_VER="$("$CLANG_ROOTDIR"/bin/ld.lld --version | head -n 1)"
 IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
