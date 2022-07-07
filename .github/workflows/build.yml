@@ -30,6 +30,6 @@ jobs:
 
       - name: Compile Kernel
         run: |
-          git clone --depth=1 https://github.com/Himemoria/android_kernel_xiaomi_mt6768 -b $KBRANCH kernel
+          git clone --depth=1 https://github.com/Alvinaja/kernel_xiaomi_mt6768 -b $KBRANCH kernel
           cp kernel-build.sh kernel && cd kernel
           chmod +x kernel-build.sh && bash kernel-build.sh
