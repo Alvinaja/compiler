@@ -30,7 +30,7 @@ jobs:
 
       - name: Compile Kernel
         run: |
-          git clone --depth=1 https://github.com/Alvinaja/kernel_xiaomi_mt6768 -b genome-release kernel
+          git clone --depth=1 https://github.com/Alvinaja/kernel_xiaomi_mt6768 kernel
           cp kernel-build.sh kernel && cd kernel
           chmod +x kernel-build.sh
           bash kernel-build.sh "FullLTO"
