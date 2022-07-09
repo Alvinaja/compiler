@@ -18,7 +18,7 @@ GCC64_DIR=$(pwd)/GCC64
 GCC32_DIR=$(pwd)/GCC32
 
 msg "|| Cloning Toolchain ||"
-git clone --depth=1 https://gitlab.com/dakkshesh07/neutron-clang -b Neutron-15 $CLANG_ROOTDIR
+git clone --depth=1 https://gitlab.com/ElectroPerf/atom-x-clang -b Neutron-15 $CLANG_ROOTDIR
 git clone --depth=1 https://github.com/cyberknight777/gcc-arm64 -b master $GCC64_DIR
 git clone --depth=1 https://github.com/cyberknight777/gcc-arm -b master $GCC32_DIR
 
